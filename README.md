@@ -144,6 +144,34 @@ docker build -t wt-daily-report .
 docker run --rm -v "$(pwd)/logs":/app/logs wt-daily-report
 ```
 
+### Container notes (workflow error & fix)
+
+If you run the GitHub Actions workflow or the container and see this error:
+
+```
+ModuleNotFoundError: No module named 'wt_report_lib'
+```
+
+Root cause: the Dockerfile only copied `wt_report.py` into the image and did not include the `wt_report_lib/` package, so Python couldn't import the new modules.
+
+Fix applied: the `Dockerfile` now explicitly copies the package into the image:
+
+```dockerfile
+COPY wt_report.py .
+COPY wt_report_lib ./wt_report_lib
+COPY .env.example .
+```
+
+Rebuild the image and run locally to confirm:
+
+```bash
+docker build -t wt-daily-report .
+docker run --rm -v "$(pwd)/logs":/app/logs wt-daily-report
+```
+
+If you prefer to copy the entire repo into the image instead, ensure you add a proper `.dockerignore` to exclude local artifacts (e.g., `venv/`, `.git`, `logs/`).
+
+
 ## Inspect logs and reports
 
 Tail the current run log:
