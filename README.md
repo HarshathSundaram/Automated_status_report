@@ -133,15 +133,15 @@ pip install -r requirements.txt
 python wt_report.py
 ```
 
-The script writes a per-day log to `logs/run_YYYY-MM-DD.log` and also creates report files in the `logs/` directory.
+The script writes a per-day log to `logs/run_YYYY-MM-DD.log`.
 
 ## Run with Docker
 
-Build and run with a host-mounted `logs/` directory so outputs persist:
+Build the image, then run it with the current project directory mounted so the code and `logs/` directory are available inside the container:
 
 ```bash
 docker build -t wt-daily-report .
-docker run --rm -v "$(pwd)/logs":/app/logs wt-daily-report
+docker run --rm -v "$(pwd)":/app -w /app wt-daily-report
 ```
 
 ### Container notes (workflow error & fix)

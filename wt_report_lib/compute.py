@@ -1,6 +1,6 @@
 from .date_utils import parse_jira_dt, age_bucket, get_report_window
 from .jira import fetch_issues, fetch_count
-from .config import SF_NOT_EMPTY, UNRESOLVED, BASE_ACTIVE, SECTION_KEYS, CAT_KEYS, PRIORITIES, AGE_BUCKETS
+from .config import SF_NOT_EMPTY, UNRESOLVED, BASE_ACTIVE, SECTION_KEYS, CAT_KEYS, PRIORITIES, AGE_BUCKETS, IST
 from datetime import datetime
 
 
@@ -60,7 +60,7 @@ def compute_report2():
         matched = next((p for p in PRIORITIES if p.lower() == pri.lower()), "Medium")
 
         created_dt = parse_jira_dt(f.get("created"))
-        days = (datetime.now().date() - created_dt.date()).days if created_dt else 0
+        days = (datetime.now(IST).date() - created_dt.date()).days if created_dt else 0
         table[matched][age_bucket(days)] += 1
 
     return table
