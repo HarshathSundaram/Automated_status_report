@@ -220,7 +220,7 @@ def format_report1(counts, completed_yesterday, new_tickets):
     lines.append(f"📊 *Grand Total:*            {grand_total}")
     lines.append("")
     lines.append(f"✅ *Completed Yesterday:*    {completed_yesterday}")
-    lines.append(f"🆕 *New Tickets (last 24h):* {new_tickets}")
+    lines.append(f"🆕 *New Tickets:* {new_tickets}")
 
     return "\n".join(lines)
 
