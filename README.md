@@ -180,12 +180,7 @@ Tail the current run log:
 tail -n 200 logs/run_$(date +%F).log
 ```
 
-Open a generated report (example):
-
-```bash
-less logs/report_2026-03-02.txt
-```
-
+The detailed report content is posted to the configured Google Chat space. Use the run log above to troubleshoot or review what was sent.
 ## Troubleshooting
 
 - Missing dependencies: `pip install -r requirements.txt`.
