@@ -240,7 +240,7 @@ def format_report2(table):
         row = f"{priority:<{pri_w}}" + "".join(f"{table[priority][b]:>{col_w}}" for b in AGE_BUCKETS)
         lines.append(row)
     lines.append("```")
-    lines.append(f"**Client Requests are not part of SLA*")
+    lines.append(f"*⚠️ Client Requests are not part of SLA*")
 
     return "\n".join(lines)
 
