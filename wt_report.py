@@ -216,7 +216,7 @@ def format_report1(counts, completed_yesterday, new_tickets):
     lines.append("")
     lines.append(f"🔴 *Rently Bugs Total:*      {cat_totals['rently_bugs']}")
     lines.append(f"🏠 *Smarthome Bugs Total:*   {cat_totals['smarthome_bugs']}")
-    lines.append(f"📋 *Client Tasks Total:*     {cat_totals['client_tasks']}")
+    lines.append(f"📋 *Client Requests Total:*     {cat_totals['client_tasks']}")
     lines.append(f"📊 *Grand Total:*            {grand_total}")
     lines.append("")
     lines.append(f"✅ *Completed Yesterday:*    {completed_yesterday}")
@@ -240,6 +240,7 @@ def format_report2(table):
         row = f"{priority:<{pri_w}}" + "".join(f"{table[priority][b]:>{col_w}}" for b in AGE_BUCKETS)
         lines.append(row)
     lines.append("```")
+    lines.append(f"**Client Requests are not part of SLA*")
 
     return "\n".join(lines)
 
