@@ -159,7 +159,6 @@ Fix applied: the `Dockerfile` now explicitly copies the package into the image:
 ```dockerfile
 COPY wt_report.py .
 COPY wt_report_lib ./wt_report_lib
-COPY .env.example .
 ```
 
 Rebuild the image and run locally to confirm:
