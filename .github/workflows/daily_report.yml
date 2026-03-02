@@ -1,0 +1,39 @@
+name: WT Board Daily Report
+
+on:
+  schedule:
+    # 4:30 AM UTC = 10:00 AM IST every day
+    - cron: '30 4 * * *'
+  workflow_dispatch:   # allow manual trigger from GitHub UI
+
+jobs:
+  send-report:
+    name: Generate & Post WT Board Reports
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t wt-daily-report .
+
+      - name: Run daily report
+        run: |
+          docker run --rm \
+            -e JIRA_BASE_URL="${{ secrets.JIRA_BASE_URL }}" \
+            -e JIRA_EMAIL="${{ secrets.JIRA_EMAIL }}" \
+            -e JIRA_API_TOKEN="${{ secrets.JIRA_API_TOKEN }}" \
+            -e GCHAT_WEBHOOK_URL="${{ secrets.GCHAT_WEBHOOK_URL }}" \
+            -e BOARD_ID="${{ secrets.BOARD_ID }}" \
+            -v ${{ github.workspace }}/logs:/app/logs \
+            wt-daily-report
+
+      - name: Upload execution log
+        if: always()   # upload even if the run step failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: wt-report-log-${{ github.run_id }}
+          path: logs/
+          retention-days: 2
