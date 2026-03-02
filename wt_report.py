@@ -173,12 +173,12 @@ def compute_report2():
 
 def format_report1(counts, completed_yesterday, new_tickets):
     today_str = datetime.now(IST).strftime("%d %b %Y")
-    lines = [f"*📊 WT Board Daily Report 1 — {today_str}*", ""]
+    lines = [f"*📊 White Team Status Report — {today_str}*", ""]
 
     categories = [
         ("rently_bugs",    "Rently Bugs"),
         ("smarthome_bugs", "Smarthome Bugs"),
-        ("client_tasks",   "Client Tasks"),
+        ("client_tasks",   "Client Requests"),
     ]
     sections = [
         ("flag_added",       "Flag Added"),
@@ -227,7 +227,7 @@ def format_report1(counts, completed_yesterday, new_tickets):
 
 def format_report2(table):
     today_str = datetime.now(IST).strftime("%d %b %Y")
-    lines = [f"*🐛 WT Board Daily Report 2 — Bug SLA Status — {today_str}*", ""]
+    lines = [f"*🐛 Open Bugs SLA Status — {today_str}*", ""]
 
     # Build plain-text table
     col_w = 10
