@@ -282,9 +282,6 @@ function formatReport1(counts, completedYesterday, newTickets) {
   });
   var grandTotal = Object.keys(catTotals).reduce(function(sum, k) { return sum + catTotals[k]; }, 0);
 
-  lines.push("🔴 *Rently Bugs Total:*      " + catTotals["rently_bugs"]);
-  lines.push("🏠 *Smarthome Bugs Total:*   " + catTotals["smarthome_bugs"]);
-  lines.push("📋 *Client Requests Total:*  " + catTotals["client_tasks"]);
   lines.push("📊 *Grand Total:*            " + grandTotal);
   lines.push("");
   lines.push("✅ *Completed Yesterday:*    " + completedYesterday);
