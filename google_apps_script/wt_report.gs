@@ -162,20 +162,24 @@ function jiraGet(url, email, token) {
 }
 
 function postToChat(webhookUrl, htmlContent, title) {
-  // Convert HTML table to image using htmltoimage.app API
+  // Convert HTML table to image using external API (currently disabled due to reliability)
   var imageUrl = convertHtmlToImage(htmlContent);
   
+  var payload;
   if (imageUrl) {
-    var payload = {
+    // If image conversion works, post the image
+    payload = {
       text: "📊 " + title,
       attachments: [{
         image_url: imageUrl
       }]
     };
   } else {
-    // Fallback: post as formatted text
-    var payload = {
-      text: htmlContent
+    // Fallback: Convert HTML to formatted text for Google Chat
+    // This extracts table data and formats it nicely
+    var textContent = htmlToFormattedText(htmlContent);
+    payload = {
+      text: textContent
     };
   }
   
@@ -192,34 +196,114 @@ function postToChat(webhookUrl, htmlContent, title) {
   }
 }
 
-function convertHtmlToImage(htmlContent) {
-  // Use HTML to Image API (htmltoimage.app or similar)
-  // This is a free, no-auth-required service
+function htmlToFormattedText(htmlContent) {
+  // Extract table data from HTML and format as readable text for Google Chat
+  // This regex-based approach works for the standard table structure we generate
   
   try {
-    var apiUrl = "https://htmltoimage.app/api/v1/convert";
-    var payload = {
-      html: htmlContent,
-      width: 1000,
-      height: "auto"
-    };
+    // Extract title/date from the first cell (special case)
+    var titleMatch = htmlContent.match(/<td[^>]*>([^<]*\s—\s[^<]*)<\/td>/);
+    var titleLine = titleMatch ? titleMatch[1] : "";
     
-    var options = {
-      method: "post",
-      contentType: "application/json",
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    };
+    // Extract all rows
+    var rows = [];
+    var rowMatches = htmlContent.match(/<tr[^>]*>.*?<\/tr>/g);
     
-    var response = UrlFetchApp.fetch(apiUrl, options);
-    if (response.getResponseCode() === 200) {
-      var result = JSON.parse(response.getContentText());
-      return result.url || null;
+    if (!rowMatches) return htmlContent; // Fallback to raw if regex fails
+    
+    rowMatches.forEach(function(rowHtml) {
+      var cells = [];
+      var cellMatches = rowHtml.match(/<td[^>]*>([^<]*)<\/td>/g);
+      
+      if (cellMatches) {
+        cellMatches.forEach(function(cellHtml) {
+          var cellContent = cellHtml.replace(/<[^>]*>/g, "").trim();
+          cells.push(cellContent);
+        });
+        rows.push(cells);
+      }
+    });
+    
+    // Format as fixed-width text table
+    if (rows.length === 0) return htmlContent;
+    
+    var lines = [];
+    
+    // Add header if title exists
+    if (titleLine) {
+      lines.push("*" + titleLine + "*");
+      lines.push("");
     }
+    
+    // Format each row with padding for alignment
+    var colWidths = [];
+    for (var c = 0; c < rows[0].length; c++) {
+      var maxWidth = 0;
+      for (var r = 0; r < rows.length; r++) {
+        if (rows[r][c]) maxWidth = Math.max(maxWidth, rows[r][c].length);
+      }
+      colWidths.push(Math.min(maxWidth + 2, 20)); // Cap at 20 for readability
+    }
+    
+    // Print header separator
+    var separator = "";
+    for (var i = 0; i < colWidths.length; i++) {
+      separator += "---" + (i < colWidths.length - 1 ? " | " : "");
+    }
+    lines.push(separator);
+    
+    // Print data rows
+    rows.forEach(function(row, idx) {
+      var line = "";
+      for (var c = 0; c < row.length; c++) {
+        var cellVal = row[c] || "";
+        line += padRight(cellVal, colWidths[c]);
+        if (c < row.length - 1) line += " | ";
+      }
+      lines.push(line);
+      
+      // Add separator after header (first row)
+      if (idx === 0) {
+        lines.push(separator);
+      }
+    });
+    
+    // Add final separator and metrics if present
+    lines.push(separator);
+    
+    // Extract metrics (Completed Yesterday, New Tickets)
+    var metricsMatch = htmlContent.match(/<strong>([^<]*)<\/strong>:\s*(\d+)/g);
+    if (metricsMatch) {
+      lines.push("");
+      metricsMatch.forEach(function(metric) {
+        lines.push(metric.replace(/<[^>]*>/g, ""));
+      });
+    }
+    
+    return "`" + lines.join("\n") + "`";
+    
   } catch (e) {
-    Logger.log("HTML to Image conversion failed: " + e);
+    Logger.log("HTML to text conversion error: " + e.toString());
+    return htmlContent; // Fallback to raw HTML if parsing fails
   }
+}
+
+function padRight(str, len) {
+  str = String(str);
+  while (str.length < len) str += " ";
+  return str;
+}
+
+function convertHtmlToImage(htmlContent) {
+  // HTML to Image conversion via external APIs is unreliable in Google Apps Script
+  // The htmltoimage.app service may have CORS issues or authentication requirements
+  // 
+  // Future approach: Store HTML on Google Drive temporarily and export as PNG,
+  // or use a paid service with proper API key handling
+  // 
+  // For now, returning null will trigger the formatted text fallback in postToChat()
   
+  Logger.log("Image conversion currently disabled (API reliability issues)");
   return null;
 }
 
