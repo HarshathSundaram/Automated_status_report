@@ -1,5 +1,5 @@
 /**
- * WT Board Daily Status Report — Google Apps Script (HTML Tables as Images)
+ * WT Board Daily Status Report — Google Apps Script
  *
  * Setup:
  *   1. Open any Google Sheet → Extensions → Apps Script
@@ -101,14 +101,14 @@ function runDailyReport() {
   Logger.log("Report 2 computed successfully.");
 
   // ── Post to Google Chat ──
-  var report1Html = formatReport1(counts, completedYesterday, newTickets);
-  var report2Html = formatReport2(table);
+  var report1 = formatReport1(counts, completedYesterday, newTickets);
+  var report2 = formatReport2(table);
 
   Logger.log("Posting Report 1 to Google Chat...");
-  postToChat(webhookUrl, report1Html, "Report 1 — Status");
+  postToChat(webhookUrl, report1);
 
   Logger.log("Posting Report 2 to Google Chat...");
-  postToChat(webhookUrl, report2Html, "Report 2 — SLA");
+  postToChat(webhookUrl, report2);
 
   Logger.log("=== Run completed successfully ===");
 }
@@ -161,161 +161,17 @@ function jiraGet(url, email, token) {
   return JSON.parse(response.getContentText());
 }
 
-function postToChat(webhookUrl, htmlContent, title) {
-  // Convert HTML table to image using external API (currently disabled due to reliability)
-  var imageUrl = convertHtmlToImage(htmlContent);
-  
-  var payload;
-  if (imageUrl) {
-    // If image conversion works, post the image
-    payload = {
-      text: "📊 " + title,
-      attachments: [{
-        image_url: imageUrl
-      }]
-    };
-  } else {
-    // Fallback: Convert HTML to formatted text for Google Chat
-    // This extracts table data and formats it nicely
-    var textContent = htmlToFormattedText(htmlContent);
-    payload = {
-      text: textContent
-    };
-  }
-  
+function postToChat(webhookUrl, text) {
   var options = {
     method: "post",
     contentType: "application/json",
-    payload: JSON.stringify(payload),
+    payload: JSON.stringify({ text: text }),
     muteHttpExceptions: true
   };
-  
   var response = UrlFetchApp.fetch(webhookUrl, options);
   if (response.getResponseCode() !== 200) {
     Logger.log("Google Chat error: " + response.getContentText());
   }
-}
-
-function htmlToFormattedText(htmlContent) {
-  // Extract table data from HTML and format as readable text for Google Chat
-  // This regex-based approach works for the standard table structure we generate
-  
-  try {
-    // Extract title/date from the first cell (special case)
-    var titleMatch = htmlContent.match(/<td[^>]*>([^<]*\s—\s[^<]*)<\/td>/);
-    var titleLine = titleMatch ? titleMatch[1] : "";
-    
-    // Extract all rows
-    var rows = [];
-    var rowMatches = htmlContent.match(/<tr[^>]*>.*?<\/tr>/g);
-    
-    if (!rowMatches) return htmlContent; // Fallback to raw if regex fails
-    
-    rowMatches.forEach(function(rowHtml) {
-      var cells = [];
-      var cellMatches = rowHtml.match(/<td[^>]*>([^<]*)<\/td>/g);
-      
-      if (cellMatches) {
-        cellMatches.forEach(function(cellHtml) {
-          var cellContent = cellHtml.replace(/<[^>]*>/g, "").trim();
-          cells.push(cellContent);
-        });
-        rows.push(cells);
-      }
-    });
-    
-    // Format as fixed-width text table
-    if (rows.length === 0) return htmlContent;
-    
-    var lines = [];
-    
-    // Add header if title exists
-    if (titleLine) {
-      lines.push("*" + titleLine + "*");
-      lines.push("");
-    }
-    
-    // Skip the first row if it contains the title (header row)
-    var startIdx = titleLine && rows[0].length > 0 && rows[0][0].indexOf("—") !== -1 ? 1 : 0;
-    var dataRows = rows.slice(startIdx);
-    
-    if (dataRows.length === 0) return htmlContent;
-    
-    // Format each row with padding for alignment
-    var colWidths = [];
-    for (var c = 0; c < dataRows[0].length; c++) {
-      var maxWidth = 0;
-      for (var r = 0; r < dataRows.length; r++) {
-        if (dataRows[r][c]) maxWidth = Math.max(maxWidth, dataRows[r][c].length);
-      }
-      colWidths.push(Math.min(maxWidth + 2, 20)); // Cap at 20 for readability
-    }
-    
-    // Print header separator
-    var separator = "";
-    for (var i = 0; i < colWidths.length; i++) {
-      separator += "---" + (i < colWidths.length - 1 ? " | " : "");
-    }
-    lines.push(separator);
-    
-    // Print data rows
-    dataRows.forEach(function(row, idx) {
-      var line = "";
-      for (var c = 0; c < row.length; c++) {
-        var cellVal = row[c] || "";
-        line += padRight(cellVal, colWidths[c]);
-        if (c < row.length - 1) line += " | ";
-      }
-      lines.push(line);
-      
-      // Add separator after header (first data row)
-      if (idx === 0) {
-        lines.push(separator);
-      }
-    });
-    
-    // Add final separator
-    lines.push(separator);
-    
-    // Extract metrics (Completed Yesterday, New Tickets)
-    var metricsMatch = htmlContent.match(/<strong>([^<]*)<\/strong>\s*(\d+)/g);
-    if (metricsMatch) {
-      lines.push("");
-      metricsMatch.forEach(function(metric) {
-        // Extract label and number from "label: number" format
-        var parts = metric.match(/<strong>([^<]*)<\/strong>\s*(\d+)/);
-        if (parts) {
-          var label = parts[1].replace(/:\s*$/, "");  // Remove trailing colon if present
-          lines.push(label + ": " + parts[2]);
-        }
-      });
-    }
-    
-    return "`" + lines.join("\n") + "`";
-    
-  } catch (e) {
-    Logger.log("HTML to text conversion error: " + e.toString());
-    return htmlContent; // Fallback to raw HTML if parsing fails
-  }
-}
-
-function padRight(str, len) {
-  str = String(str);
-  while (str.length < len) str += " ";
-  return str;
-}
-
-function convertHtmlToImage(htmlContent) {
-  // HTML to Image conversion via external APIs is unreliable in Google Apps Script
-  // The htmltoimage.app service may have CORS issues or authentication requirements
-  // 
-  // Future approach: Store HTML on Google Drive temporarily and export as PNG,
-  // or use a paid service with proper API key handling
-  // 
-  // For now, returning null will trigger the formatted text fallback in postToChat()
-  
-  Logger.log("Image conversion currently disabled (API reliability issues)");
-  return null;
 }
 
 // ─── Categorize issue ─────────────────────────────────────────────────────────
@@ -333,6 +189,7 @@ function categorize(raw) {
 // ─── Date helpers (IST) ───────────────────────────────────────────────────────
 
 function getReportWindow() {
+  // IST = UTC+5:30
   var nowUTC        = new Date();
   var istOffset     = 5.5 * 60 * 60 * 1000;
   var nowIST        = new Date(nowUTC.getTime() + istOffset);
@@ -359,108 +216,102 @@ function ageBucket(days) {
   return ">10 days";
 }
 
-// ─── Report formatters (HTML tables) ──────────────────────────────────────────
+// ─── Report formatters ────────────────────────────────────────────────────────
 
 function formatReport1(counts, completedYesterday, newTickets) {
   var now     = new Date();
   var dateStr = Utilities.formatDate(now, "Asia/Kolkata", "dd MMM yyyy");
+  var lines   = ["*📊 White Team Status Report — " + dateStr + "*", ""];
 
   var categories = [
-    { key: "rently_bugs",    label: "Rently"          },
-    { key: "smarthome_bugs", label: "Smart Home"      },
+    { key: "rently_bugs",    label: "Rently Bugs"     },
+    { key: "smarthome_bugs", label: "Smarthome Bugs"  },
     { key: "client_tasks",   label: "Client Requests" }
   ];
   var sections = [
-    { key: "flag_added",       label: "With Feature Team" },
-    { key: "backlog",          label: "Backlog"           },
-    { key: "in_progress",      label: "Work in Progress"  },
-    { key: "ready_for_deploy", label: "Production Ready"  },
-    { key: "verification",     label: "Verification"      }
+    { key: "flag_added",       label: "Flag Added"       },
+    { key: "backlog",          label: "Backlog"          },
+    { key: "in_progress",      label: "In Progress"      },
+    { key: "ready_for_deploy", label: "Ready for Deploy" },
+    { key: "verification",     label: "Verification"     }
   ];
 
-  // Build HTML table
-  var html = '<table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; font-family:Arial; font-size:12px;">';
-  
-  // Header row
-  html += '<tr style="background-color:#4472C4; color:white;">';
-  html += '<td style="font-weight:bold; padding:10px;">' + dateStr + ' — White Team Status</td>';
+  var secW  = 18;
+  var colW  = 15;
+
+  var header = padR("Section", secW) + categories.map(function(c) { return padC(c.label, colW); }).join("");
+  var sep    = repeat("=", header.length);
+  var thin   = repeat("-", header.length);
+
+  lines.push("```");
+  lines.push(sep);
+  lines.push(header);
+  lines.push(sep);
+
+  sections.forEach(function(sec) {
+    var row = padR(sec.label, secW) + categories.map(function(cat) {
+      return padC(String(counts[cat.key][sec.key]), colW);
+    }).join("");
+    lines.push(row);
+    lines.push(thin);
+  });
+
+  lines.push("```");
+  lines.push("");
+
+  var catTotals = {};
   categories.forEach(function(cat) {
-    html += '<td style="font-weight:bold; text-align:center; padding:10px;">' + cat.label + '</td>';
+    catTotals[cat.key] = SECTION_KEYS.reduce(function(sum, s) { return sum + counts[cat.key][s]; }, 0);
   });
-  html += '<td style="font-weight:bold; text-align:center; padding:10px;">Total</td>';
-  html += '</tr>';
+  var grandTotal = Object.keys(catTotals).reduce(function(sum, k) { return sum + catTotals[k]; }, 0);
 
-  // Section rows
-  sections.forEach(function(sec, idx) {
-    var bgColor = idx % 2 === 0 ? "#D9E1F2" : "#FFFFFF";
-    html += '<tr style="background-color:' + bgColor + ';">';
-    html += '<td style="font-weight:bold; padding:10px;">' + sec.label + '</td>';
-    var rowTotal = 0;
-    categories.forEach(function(cat) {
-      var val = counts[cat.key][sec.key];
-      rowTotal += val;
-      html += '<td style="text-align:center; padding:10px;">' + val + '</td>';
-    });
-    html += '<td style="font-weight:bold; text-align:center; padding:10px;">' + rowTotal + '</td>';
-    html += '</tr>';
-  });
+  lines.push("🔴 *Rently Bugs Total:*      " + catTotals["rently_bugs"]);
+  lines.push("🏠 *Smarthome Bugs Total:*   " + catTotals["smarthome_bugs"]);
+  lines.push("📋 *Client Requests Total:*  " + catTotals["client_tasks"]);
+  lines.push("📊 *Grand Total:*            " + grandTotal);
+  lines.push("");
+  lines.push("✅ *Completed Yesterday:*    " + completedYesterday);
+  lines.push("🆕 *New Tickets:*            " + newTickets);
 
-  // Totals row
-  html += '<tr style="background-color:#FFC7CE; font-weight:bold;">';
-  html += '<td style="padding:10px;">TOTAL</td>';
-  var colTotals = {};
-  categories.forEach(function(cat) {
-    colTotals[cat.key] = SECTION_KEYS.reduce(function(sum, s) { return sum + counts[cat.key][s]; }, 0);
-  });
-  var grandTotal = Object.keys(colTotals).reduce(function(sum, k) { return sum + colTotals[k]; }, 0);
-  categories.forEach(function(cat) {
-    html += '<td style="text-align:center; padding:10px;">' + colTotals[cat.key] + '</td>';
-  });
-  html += '<td style="text-align:center; padding:10px;">' + grandTotal + '</td>';
-  html += '</tr>';
-
-  html += '</table>';
-  html += '<br/><div style="font-size:12px; font-family:Arial;">';
-  html += '<strong>Completed Yesterday:</strong> ' + completedYesterday + ' &nbsp; | &nbsp; <strong>New Tickets:</strong> ' + newTickets;
-  html += '</div>';
-
-  return html;
+  return lines.join("\n");
 }
 
 function formatReport2(table) {
   var now     = new Date();
   var dateStr = Utilities.formatDate(now, "Asia/Kolkata", "dd MMM yyyy");
+  var lines   = ["*🐛 Open Bugs SLA Status — " + dateStr + "*", ""];
 
-  // Build HTML table
-  var html = '<table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; font-family:Arial; font-size:12px;">';
-  
-  // Header row
-  html += '<tr style="background-color:#70AD47; color:white;">';
-  html += '<td style="font-weight:bold; padding:10px;">🐛 Open Bugs SLA — ' + dateStr + '</td>';
-  AGE_BUCKETS.forEach(function(b) {
-    html += '<td style="font-weight:bold; text-align:center; padding:10px;">' + b + '</td>';
-  });
-  html += '</tr>';
+  var priW  = 12;
+  var colW  = 10;
+  var header = padR("Priority", priW) + AGE_BUCKETS.map(function(b) { return padL(b, colW); }).join("");
+  var sep    = repeat("-", header.length);
 
-  // Priority rows
-  PRIORITIES.forEach(function(p, idx) {
-    var bgColor = idx % 2 === 0 ? "#E2EFDA" : "#FFFFFF";
-    html += '<tr style="background-color:' + bgColor + ';">';
-    html += '<td style="font-weight:bold; padding:10px;">' + p + '</td>';
-    AGE_BUCKETS.forEach(function(b) {
-      var val = table[p][b];
-      html += '<td style="text-align:center; padding:10px;">' + val + '</td>';
-    });
-    html += '</tr>';
+  lines.push("```");
+  lines.push(header);
+  lines.push(sep);
+
+  PRIORITIES.forEach(function(p) {
+    var row = padR(p, priW) + AGE_BUCKETS.map(function(b) { return padL(String(table[p][b]), colW); }).join("");
+    lines.push(row);
   });
 
-  html += '</table>';
-  html += '<br/><div style="font-size:12px; font-family:Arial;">';
-  html += '<strong>⚠️ Client Requests are not part of SLA</strong>';
-  html += '</div>';
+  lines.push("```");
+  lines.push("*⚠️ Client Requests are not part of SLA*");
 
-  return html;
+  return lines.join("\n");
 }
+
+// ─── String helpers ───────────────────────────────────────────────────────────
+
+function padR(s, w) { s = String(s); return s + repeat(" ", Math.max(0, w - s.length)); }
+function padL(s, w) { s = String(s); return repeat(" ", Math.max(0, w - s.length)) + s; }
+function padC(s, w) {
+  s = String(s);
+  var total = Math.max(0, w - s.length);
+  var left  = Math.floor(total / 2);
+  return repeat(" ", left) + s + repeat(" ", total - left);
+}
+function repeat(ch, n) { var r = ""; for (var i = 0; i < n; i++) r += ch; return r; }
 
 // ─── One-time trigger setup ───────────────────────────────────────────────────
 
@@ -482,7 +333,7 @@ function setupDailyTrigger() {
   ScriptApp.newTrigger("runDailyReport")
     .timeBased()
     .everyDays(1)
-    .atHour(10)
+    .atHour(10)   // 10:00–11:00 AM in sheet timezone (set to Asia/Kolkata)
     .create();
 
   Logger.log("✅ Daily trigger registered. Fires at 10:00–11:00 AM IST every day.");
