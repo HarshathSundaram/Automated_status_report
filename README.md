@@ -8,7 +8,8 @@ Automated daily status reports for the **WT Jira Board (Board ID: 21)** using **
 ✅ **No setup complexity** — paste script into Google Sheets, add 4 credentials  
 ✅ **Automatic daily trigger** — fires at 10:00–11:00 AM IST every day  
 ✅ **Two formatted reports** — status breakdown + SLA tracking  
-✅ **Google Chat integration** — posts directly to team space via webhook  
+✅ **Google Chat integration** — posts beautifully formatted text tables via webhook  
+✅ **Mobile-friendly** — monospace formatted tables display well on all devices  
 
 ---
 
@@ -110,7 +111,9 @@ The script:
    - Calculates age buckets for bug SLA tracking
    - Counts completed/new tickets in the 24h IST window (yesterday 10 AM → today 10 AM)
 
-3. **Formats reports** as monospace tables for Google Chat
+3. **Formats reports** as fixed-width monospace text tables for Google Chat
+   - Tables include aligned columns, separators, and headers
+   - Format is readable on desktop, mobile, and in chat threads
 
 4. **Posts to Google Chat** via webhook
 
@@ -120,55 +123,57 @@ All computation happens on Google's servers. No credentials are logged; only exe
 
 ## Report Format
 
+Reports are displayed as **fixed-width monospace text tables** that render beautifully in Google Chat on all devices.
+
 ### Report 1 Example
 
 ```
-📊 White Team Status Report — 03 Mar 2026
+*03 Mar 2026 — White Team Status*
 
-==================================================
-Section           Rently  Smarthome  Client
-==================================================
-Flag Added             2         1       0
-(With Feature Team
-/3rd Party Dependency)
--------------------------------------------------
-Backlog                1         0       1
--------------------------------------------------
-In Progress            6         1       1
--------------------------------------------------
-Ready for Deploy       0         1       0
--------------------------------------------------
-Verification           0         0       0
--------------------------------------------------
-Total                  9         3       2
-==================================================
+--- | --- | --- | --- | ---
+With Feature Team | 4 | 1 | 0 | 5
+Backlog          | 0 | 2 | 1 | 3
+Work in Progress | 6 | 1 | 2 | 9
+Production Ready | 0 | 1 | 0 | 1
+Verification     | 0 | 0 | 0 | 0
+--- | --- | --- | --- | ---
+TOTAL            | 10| 5 | 3 | 18
 
-📊 Grand Total:            14
-
-✅ Completed Yesterday:    2
-🆕 New Tickets:            3
+**Completed Yesterday:** 2 | **New Tickets:** 3
 ```
+
+**Columns:**
+- Section name
+- Rently (bug count)
+- Smart Home (bug count)  
+- Client Requests (task count)
+- Total
 
 ### Report 2 Example
 
 ```
-🐛 Open Bugs SLA Status — 03 Mar 2026
+*🐛 Open Bugs SLA — 03 Mar 2026*
 
-Priority      0-1 days  2-3 days  4-5 days  6-10 days  >10 days
---------------------------------------------------------------
-Code Red             0         0         0          0          0
-Highest              0         0         0          0          0
-High                 0         1         2          0          1
-Medium               0         0         3          1          5
-Low                  0         0         0          0          0
-Information          0         0         0          0          0
+--- | --- | --- | --- | --- | ---
+Code Red    | 0 | 0 | 0 | 0 | 0
+Highest     | 0 | 0 | 0 | 0 | 0
+High        | 0 | 1 | 2 | 0 | 1
+Medium      | 0 | 0 | 3 | 1 | 5
+Low         | 0 | 0 | 0 | 0 | 0
+Information | 0 | 0 | 0 | 0 | 0
 
 ⚠️ Client Requests are not part of SLA
 ```
 
+**Columns:** Priority level → Age buckets (0-1 days, 2-3 days, 4-5 days, 6-10 days, >10 days)
+
 ---
 
 ## Troubleshooting
+
+### Tables display as HTML code instead of formatted text
+- **This was an issue in earlier versions.** The script now converts HTML tables to readable monospace text for Google Chat.
+- If you see raw `<table>` HTML in Google Chat, your script is using the old version. Re-paste the latest code from `google_apps_script/wt_report.gs` into your Apps Script editor.
 
 ### Script doesn't run at the scheduled time
 - Check that your Google Sheet timezone is set to **Asia/Kolkata** (File → Settings)
