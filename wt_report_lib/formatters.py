@@ -12,14 +12,15 @@ def format_report1(counts, completed_yesterday, new_tickets):
         ("client_tasks", "Client Requests"),
     ]
     sections = [
-        ("flag_added", "Flag Added"),
+        ("flag_added", "Flag Added (With Feature Team/Third party dependency)"),
         ("backlog", "Backlog"),
         ("in_progress", "In Progress"),
         ("ready_for_deploy", "Ready for Deploy"),
         ("verification", "Verification"),
     ]
 
-    sec_w = max(len(s[1]) for s in sections) + 2
+    # Fixed width for the section column to accommodate the longer label
+    sec_w = 56
     col_widths = [max(len(c[1]) + 2, 6) for c in categories]
 
     header = f"{'Section':<{sec_w}}" + "".join(f"{c[1]:^{col_widths[i]}}" for i, c in enumerate(categories))
