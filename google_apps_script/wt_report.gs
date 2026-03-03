@@ -229,11 +229,11 @@ function formatReport1(counts, completedYesterday, newTickets) {
     { key: "client_tasks",   label: "Client Requests" }
   ];
   var sections = [
-    { key: "flag_added",       label: "Flag Added"       },
-    { key: "backlog",          label: "Backlog"          },
-    { key: "in_progress",      label: "In Progress"      },
-    { key: "ready_for_deploy", label: "Ready for Deploy" },
-    { key: "verification",     label: "Verification"     }
+    { key: "flag_added",       lines: ["Flag Added", "(With Feature Team", "/3rd Party Dependency)"] },
+    { key: "backlog",          lines: ["Backlog"] },
+    { key: "in_progress",      lines: ["In Progress"] },
+    { key: "ready_for_deploy", lines: ["Ready for Deploy"] },
+    { key: "verification",     lines: ["Verification"] }
   ];
 
   var secW  = 18;
@@ -248,26 +248,37 @@ function formatReport1(counts, completedYesterday, newTickets) {
   lines.push(header);
   lines.push(sep);
 
+  // Add section rows
   sections.forEach(function(sec) {
-    var row = padR(sec.label, secW) + categories.map(function(cat) {
+    var row = padR(sec.lines[0], secW) + categories.map(function(cat) {
       return padC(String(counts[cat.key][sec.key]), colW);
     }).join("");
     lines.push(row);
+    
+    // Add sub-label lines if present
+    for (var i = 1; i < sec.lines.length; i++) {
+      var subRow = padR(sec.lines[i], secW) + categories.map(function() {
+        return repeat(" ", colW);
+      }).join("");
+      lines.push(subRow);
+    }
     lines.push(thin);
   });
 
-  lines.push("```");
-  lines.push("");
-
+  // Calculate and add totals row
   var catTotals = {};
   categories.forEach(function(cat) {
     catTotals[cat.key] = SECTION_KEYS.reduce(function(sum, s) { return sum + counts[cat.key][s]; }, 0);
   });
   var grandTotal = Object.keys(catTotals).reduce(function(sum, k) { return sum + catTotals[k]; }, 0);
 
-  lines.push("🔴 *Rently Bugs Total:*      " + catTotals["rently_bugs"]);
-  lines.push("🏠 *Smarthome Bugs Total:*   " + catTotals["smarthome_bugs"]);
-  lines.push("📋 *Client Requests Total:*  " + catTotals["client_tasks"]);
+  var totalRow = padR("Total", secW) + categories.map(function(cat) {
+    return padC(String(catTotals[cat.key]), colW);
+  }).join("");
+  lines.push(totalRow);
+  lines.push("```");
+  lines.push("");
+
   lines.push("📊 *Grand Total:*            " + grandTotal);
   lines.push("");
   lines.push("✅ *Completed Yesterday:*    " + completedYesterday);
