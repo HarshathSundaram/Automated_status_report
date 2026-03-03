@@ -235,12 +235,18 @@ function htmlToFormattedText(htmlContent) {
       lines.push("");
     }
     
+    // Skip the first row if it contains the title (header row)
+    var startIdx = titleLine && rows[0].length > 0 && rows[0][0].indexOf("—") !== -1 ? 1 : 0;
+    var dataRows = rows.slice(startIdx);
+    
+    if (dataRows.length === 0) return htmlContent;
+    
     // Format each row with padding for alignment
     var colWidths = [];
-    for (var c = 0; c < rows[0].length; c++) {
+    for (var c = 0; c < dataRows[0].length; c++) {
       var maxWidth = 0;
-      for (var r = 0; r < rows.length; r++) {
-        if (rows[r][c]) maxWidth = Math.max(maxWidth, rows[r][c].length);
+      for (var r = 0; r < dataRows.length; r++) {
+        if (dataRows[r][c]) maxWidth = Math.max(maxWidth, dataRows[r][c].length);
       }
       colWidths.push(Math.min(maxWidth + 2, 20)); // Cap at 20 for readability
     }
@@ -253,7 +259,7 @@ function htmlToFormattedText(htmlContent) {
     lines.push(separator);
     
     // Print data rows
-    rows.forEach(function(row, idx) {
+    dataRows.forEach(function(row, idx) {
       var line = "";
       for (var c = 0; c < row.length; c++) {
         var cellVal = row[c] || "";
@@ -262,21 +268,26 @@ function htmlToFormattedText(htmlContent) {
       }
       lines.push(line);
       
-      // Add separator after header (first row)
+      // Add separator after header (first data row)
       if (idx === 0) {
         lines.push(separator);
       }
     });
     
-    // Add final separator and metrics if present
+    // Add final separator
     lines.push(separator);
     
     // Extract metrics (Completed Yesterday, New Tickets)
-    var metricsMatch = htmlContent.match(/<strong>([^<]*)<\/strong>:\s*(\d+)/g);
+    var metricsMatch = htmlContent.match(/<strong>([^<]*)<\/strong>\s*(\d+)/g);
     if (metricsMatch) {
       lines.push("");
       metricsMatch.forEach(function(metric) {
-        lines.push(metric.replace(/<[^>]*>/g, ""));
+        // Extract label and number from "label: number" format
+        var parts = metric.match(/<strong>([^<]*)<\/strong>\s*(\d+)/);
+        if (parts) {
+          var label = parts[1].replace(/:\s*$/, "");  // Remove trailing colon if present
+          lines.push(label + ": " + parts[2]);
+        }
       });
     }
     
