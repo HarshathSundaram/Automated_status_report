@@ -12,7 +12,7 @@ def format_report1(counts, completed_yesterday, new_tickets):
         ("client_tasks", "Client Requests"),
     ]
     sections = [
-        ("flag_added", ("Flag Added", "(With Feature Team/Third party dependency)")),
+        ("flag_added", ("Flag Added", ("(With Feature Team", "/3rd party dependency)"))),
         ("backlog", "Backlog"),
         ("in_progress", "In Progress"),
         ("ready_for_deploy", "Ready for Deploy"),
@@ -39,7 +39,11 @@ def format_report1(counts, completed_yesterday, new_tickets):
             lines.append(row)
             sub_label = sec_label[1]
             blank_counts = "".join(f"{'':^{col_widths[i]}}" for i in range(len(categories)))
-            lines.append(f"{sub_label:<{sec_w}}" + blank_counts)
+            if isinstance(sub_label, (list, tuple)):
+                for part in sub_label:
+                    lines.append(f"{part:<{sec_w}}" + blank_counts)
+            else:
+                lines.append(f"{sub_label:<{sec_w}}" + blank_counts)
             lines.append(thin_sep)
         else:
             row = f"{sec_label:<{sec_w}}" + "".join(
