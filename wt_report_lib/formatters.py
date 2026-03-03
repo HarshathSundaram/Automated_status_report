@@ -12,15 +12,14 @@ def format_report1(counts, completed_yesterday, new_tickets):
         ("client_tasks", "Client Requests"),
     ]
     sections = [
-        ("flag_added", "Flag Added (With Feature Team/Third party dependency)"),
+        ("flag_added", ("Flag Added", "(With Feature Team/Third party dependency)")),
         ("backlog", "Backlog"),
         ("in_progress", "In Progress"),
         ("ready_for_deploy", "Ready for Deploy"),
         ("verification", "Verification"),
     ]
 
-    # Fixed width for the section column to accommodate the longer label
-    sec_w = 56
+    sec_w = max(len(s[1]) for s in sections) + 2
     col_widths = [max(len(c[1]) + 2, 6) for c in categories]
 
     header = f"{'Section':<{sec_w}}" + "".join(f"{c[1]:^{col_widths[i]}}" for i, c in enumerate(categories))
@@ -32,11 +31,22 @@ def format_report1(counts, completed_yesterday, new_tickets):
     lines.append(sep)
 
     for sec_key, sec_label in sections:
-        row = f"{sec_label:<{sec_w}}" + "".join(
-            f"{counts[cat_key][sec_key]:^{col_widths[i]}}" for i, (cat_key, _) in enumerate(categories)
-        )
-        lines.append(row)
-        lines.append(thin_sep)
+        if isinstance(sec_label, (list, tuple)):
+            main_label = sec_label[0]
+            row = f"{main_label:<{sec_w}}" + "".join(
+                f"{counts[cat_key][sec_key]:^{col_widths[i]}}" for i, (cat_key, _) in enumerate(categories)
+            )
+            lines.append(row)
+            sub_label = sec_label[1]
+            blank_counts = "".join(f"{'':^{col_widths[i]}}" for i in range(len(categories)))
+            lines.append(f"{sub_label:<{sec_w}}" + blank_counts)
+            lines.append(thin_sep)
+        else:
+            row = f"{sec_label:<{sec_w}}" + "".join(
+                f"{counts[cat_key][sec_key]:^{col_widths[i]}}" for i, (cat_key, _) in enumerate(categories)
+            )
+            lines.append(row)
+            lines.append(thin_sep)
 
     lines.append("```")
 
