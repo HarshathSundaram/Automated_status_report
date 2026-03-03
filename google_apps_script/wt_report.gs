@@ -1,5 +1,5 @@
 /**
- * WT Board Daily Status Report — Google Apps Script
+ * WT Board Daily Status Report — Google Apps Script (HTML Tables as Images)
  *
  * Setup:
  *   1. Open any Google Sheet → Extensions → Apps Script
@@ -101,14 +101,14 @@ function runDailyReport() {
   Logger.log("Report 2 computed successfully.");
 
   // ── Post to Google Chat ──
-  var report1 = formatReport1(counts, completedYesterday, newTickets);
-  var report2 = formatReport2(table);
+  var report1Html = formatReport1(counts, completedYesterday, newTickets);
+  var report2Html = formatReport2(table);
 
   Logger.log("Posting Report 1 to Google Chat...");
-  postToChat(webhookUrl, report1);
+  postToChat(webhookUrl, report1Html, "Report 1 — Status");
 
   Logger.log("Posting Report 2 to Google Chat...");
-  postToChat(webhookUrl, report2);
+  postToChat(webhookUrl, report2Html, "Report 2 — SLA");
 
   Logger.log("=== Run completed successfully ===");
 }
@@ -161,17 +161,66 @@ function jiraGet(url, email, token) {
   return JSON.parse(response.getContentText());
 }
 
-function postToChat(webhookUrl, text) {
+function postToChat(webhookUrl, htmlContent, title) {
+  // Convert HTML table to image using htmltoimage.app API
+  var imageUrl = convertHtmlToImage(htmlContent);
+  
+  if (imageUrl) {
+    var payload = {
+      text: "📊 " + title,
+      attachments: [{
+        image_url: imageUrl
+      }]
+    };
+  } else {
+    // Fallback: post as formatted text
+    var payload = {
+      text: htmlContent
+    };
+  }
+  
   var options = {
     method: "post",
     contentType: "application/json",
-    payload: JSON.stringify({ text: text }),
+    payload: JSON.stringify(payload),
     muteHttpExceptions: true
   };
+  
   var response = UrlFetchApp.fetch(webhookUrl, options);
   if (response.getResponseCode() !== 200) {
     Logger.log("Google Chat error: " + response.getContentText());
   }
+}
+
+function convertHtmlToImage(htmlContent) {
+  // Use HTML to Image API (htmltoimage.app or similar)
+  // This is a free, no-auth-required service
+  
+  try {
+    var apiUrl = "https://htmltoimage.app/api/v1/convert";
+    var payload = {
+      html: htmlContent,
+      width: 1000,
+      height: "auto"
+    };
+    
+    var options = {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    var response = UrlFetchApp.fetch(apiUrl, options);
+    if (response.getResponseCode() === 200) {
+      var result = JSON.parse(response.getContentText());
+      return result.url || null;
+    }
+  } catch (e) {
+    Logger.log("HTML to Image conversion failed: " + e);
+  }
+  
+  return null;
 }
 
 // ─── Categorize issue ─────────────────────────────────────────────────────────
@@ -189,7 +238,6 @@ function categorize(raw) {
 // ─── Date helpers (IST) ───────────────────────────────────────────────────────
 
 function getReportWindow() {
-  // IST = UTC+5:30
   var nowUTC        = new Date();
   var istOffset     = 5.5 * 60 * 60 * 1000;
   var nowIST        = new Date(nowUTC.getTime() + istOffset);
@@ -216,113 +264,108 @@ function ageBucket(days) {
   return ">10 days";
 }
 
-// ─── Report formatters ────────────────────────────────────────────────────────
+// ─── Report formatters (HTML tables) ──────────────────────────────────────────
 
 function formatReport1(counts, completedYesterday, newTickets) {
   var now     = new Date();
   var dateStr = Utilities.formatDate(now, "Asia/Kolkata", "dd MMM yyyy");
-  var lines   = ["*📊 White Team Status Report — " + dateStr + "*", ""];
 
   var categories = [
-    { key: "rently_bugs",    label: "Rently Bugs"     },
-    { key: "smarthome_bugs", label: "Smarthome Bugs"  },
+    { key: "rently_bugs",    label: "Rently"          },
+    { key: "smarthome_bugs", label: "Smart Home"      },
     { key: "client_tasks",   label: "Client Requests" }
   ];
   var sections = [
-    { key: "flag_added",       lines: ["Flag Added", "(With Feature Team", "/3rd Party Dependency)"] },
-    { key: "backlog",          lines: ["Backlog"] },
-    { key: "in_progress",      lines: ["In Progress"] },
-    { key: "ready_for_deploy", lines: ["Ready for Deploy"] },
-    { key: "verification",     lines: ["Verification"] }
+    { key: "flag_added",       label: "With Feature Team" },
+    { key: "backlog",          label: "Backlog"           },
+    { key: "in_progress",      label: "Work in Progress"  },
+    { key: "ready_for_deploy", label: "Production Ready"  },
+    { key: "verification",     label: "Verification"      }
   ];
 
-  var secW  = 18;
-  var colW  = 15;
-
-  var header = padR("Section", secW) + categories.map(function(c) { return padC(c.label, colW); }).join("");
-  var sep    = repeat("=", header.length);
-  var thin   = repeat("-", header.length);
-
-  lines.push("```");
-  lines.push(sep);
-  lines.push(header);
-  lines.push(sep);
-
-  // Add section rows
-  sections.forEach(function(sec) {
-    var row = padR(sec.lines[0], secW) + categories.map(function(cat) {
-      return padC(String(counts[cat.key][sec.key]), colW);
-    }).join("");
-    lines.push(row);
-    
-    // Add sub-label lines if present
-    for (var i = 1; i < sec.lines.length; i++) {
-      var subRow = padR(sec.lines[i], secW) + categories.map(function() {
-        return repeat(" ", colW);
-      }).join("");
-      lines.push(subRow);
-    }
-    lines.push(thin);
-  });
-
-  // Calculate and add totals row
-  var catTotals = {};
+  // Build HTML table
+  var html = '<table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; font-family:Arial; font-size:12px;">';
+  
+  // Header row
+  html += '<tr style="background-color:#4472C4; color:white;">';
+  html += '<td style="font-weight:bold; padding:10px;">' + dateStr + ' — White Team Status</td>';
   categories.forEach(function(cat) {
-    catTotals[cat.key] = SECTION_KEYS.reduce(function(sum, s) { return sum + counts[cat.key][s]; }, 0);
+    html += '<td style="font-weight:bold; text-align:center; padding:10px;">' + cat.label + '</td>';
   });
-  var grandTotal = Object.keys(catTotals).reduce(function(sum, k) { return sum + catTotals[k]; }, 0);
+  html += '<td style="font-weight:bold; text-align:center; padding:10px;">Total</td>';
+  html += '</tr>';
 
-  var totalRow = padR("Total", secW) + categories.map(function(cat) {
-    return padC(String(catTotals[cat.key]), colW);
-  }).join("");
-  lines.push(totalRow);
-  lines.push("```");
-  lines.push("");
+  // Section rows
+  sections.forEach(function(sec, idx) {
+    var bgColor = idx % 2 === 0 ? "#D9E1F2" : "#FFFFFF";
+    html += '<tr style="background-color:' + bgColor + ';">';
+    html += '<td style="font-weight:bold; padding:10px;">' + sec.label + '</td>';
+    var rowTotal = 0;
+    categories.forEach(function(cat) {
+      var val = counts[cat.key][sec.key];
+      rowTotal += val;
+      html += '<td style="text-align:center; padding:10px;">' + val + '</td>';
+    });
+    html += '<td style="font-weight:bold; text-align:center; padding:10px;">' + rowTotal + '</td>';
+    html += '</tr>';
+  });
 
-  lines.push("📊 *Grand Total:*            " + grandTotal);
-  lines.push("");
-  lines.push("✅ *Completed Yesterday:*    " + completedYesterday);
-  lines.push("🆕 *New Tickets:*            " + newTickets);
+  // Totals row
+  html += '<tr style="background-color:#FFC7CE; font-weight:bold;">';
+  html += '<td style="padding:10px;">TOTAL</td>';
+  var colTotals = {};
+  categories.forEach(function(cat) {
+    colTotals[cat.key] = SECTION_KEYS.reduce(function(sum, s) { return sum + counts[cat.key][s]; }, 0);
+  });
+  var grandTotal = Object.keys(colTotals).reduce(function(sum, k) { return sum + colTotals[k]; }, 0);
+  categories.forEach(function(cat) {
+    html += '<td style="text-align:center; padding:10px;">' + colTotals[cat.key] + '</td>';
+  });
+  html += '<td style="text-align:center; padding:10px;">' + grandTotal + '</td>';
+  html += '</tr>';
 
-  return lines.join("\n");
+  html += '</table>';
+  html += '<br/><div style="font-size:12px; font-family:Arial;">';
+  html += '<strong>Completed Yesterday:</strong> ' + completedYesterday + ' &nbsp; | &nbsp; <strong>New Tickets:</strong> ' + newTickets;
+  html += '</div>';
+
+  return html;
 }
 
 function formatReport2(table) {
   var now     = new Date();
   var dateStr = Utilities.formatDate(now, "Asia/Kolkata", "dd MMM yyyy");
-  var lines   = ["*🐛 Open Bugs SLA Status — " + dateStr + "*", ""];
 
-  var priW  = 12;
-  var colW  = 10;
-  var header = padR("Priority", priW) + AGE_BUCKETS.map(function(b) { return padL(b, colW); }).join("");
-  var sep    = repeat("-", header.length);
+  // Build HTML table
+  var html = '<table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse; font-family:Arial; font-size:12px;">';
+  
+  // Header row
+  html += '<tr style="background-color:#70AD47; color:white;">';
+  html += '<td style="font-weight:bold; padding:10px;">🐛 Open Bugs SLA — ' + dateStr + '</td>';
+  AGE_BUCKETS.forEach(function(b) {
+    html += '<td style="font-weight:bold; text-align:center; padding:10px;">' + b + '</td>';
+  });
+  html += '</tr>';
 
-  lines.push("```");
-  lines.push(header);
-  lines.push(sep);
-
-  PRIORITIES.forEach(function(p) {
-    var row = padR(p, priW) + AGE_BUCKETS.map(function(b) { return padL(String(table[p][b]), colW); }).join("");
-    lines.push(row);
+  // Priority rows
+  PRIORITIES.forEach(function(p, idx) {
+    var bgColor = idx % 2 === 0 ? "#E2EFDA" : "#FFFFFF";
+    html += '<tr style="background-color:' + bgColor + ';">';
+    html += '<td style="font-weight:bold; padding:10px;">' + p + '</td>';
+    AGE_BUCKETS.forEach(function(b) {
+      var val = table[p][b];
+      html += '<td style="text-align:center; padding:10px;">' + val + '</td>';
+    });
+    html += '</tr>';
   });
 
-  lines.push("```");
-  lines.push("*⚠️ Client Requests are not part of SLA*");
+  html += '</table>';
+  html += '<br/><div style="font-size:12px; font-family:Arial;">';
+  html += '<strong>⚠️ Client Requests are not part of SLA</strong>';
+  html += '</div>';
 
-  return lines.join("\n");
+  return html;
 }
-
-// ─── String helpers ───────────────────────────────────────────────────────────
-
-function padR(s, w) { s = String(s); return s + repeat(" ", Math.max(0, w - s.length)); }
-function padL(s, w) { s = String(s); return repeat(" ", Math.max(0, w - s.length)) + s; }
-function padC(s, w) {
-  s = String(s);
-  var total = Math.max(0, w - s.length);
-  var left  = Math.floor(total / 2);
-  return repeat(" ", left) + s + repeat(" ", total - left);
-}
-function repeat(ch, n) { var r = ""; for (var i = 0; i < n; i++) r += ch; return r; }
 
 // ─── One-time trigger setup ───────────────────────────────────────────────────
 
@@ -344,7 +387,7 @@ function setupDailyTrigger() {
   ScriptApp.newTrigger("runDailyReport")
     .timeBased()
     .everyDays(1)
-    .atHour(10)   // 10:00–11:00 AM in sheet timezone (set to Asia/Kolkata)
+    .atHour(10)
     .create();
 
   Logger.log("✅ Daily trigger registered. Fires at 10:00–11:00 AM IST every day.");
