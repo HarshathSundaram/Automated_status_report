@@ -229,7 +229,7 @@ function formatReport1(counts, completedYesterday, newTickets) {
     { key: "client_tasks",   label: "Client Requests" }
   ];
   var sections = [
-    { key: "flag_added",       label: "Flag Added"       },
+    { key: "flag_added",       label: "Flag Added",       multiline: ["Flag Added", "(With Feature Team", "/3rd Party Dependency)"] },
     { key: "backlog",          label: "Backlog"          },
     { key: "in_progress",      label: "In Progress"      },
     { key: "ready_for_deploy", label: "Ready for Deploy" },
@@ -249,12 +249,29 @@ function formatReport1(counts, completedYesterday, newTickets) {
   lines.push(sep);
 
   sections.forEach(function(sec) {
-    var row = padR(sec.label, secW) + categories.map(function(cat) {
+    var displayLabel = sec.label;
+    var row = padR(displayLabel, secW) + categories.map(function(cat) {
       return padC(String(counts[cat.key][sec.key]), colW);
     }).join("");
     lines.push(row);
+    
+    // If multiline label, print additional lines
+    if (sec.multiline) {
+      for (var i = 1; i < sec.multiline.length; i++) {
+        lines.push(padR(sec.multiline[i], secW) + repeat(" ", header.length - secW));
+      }
+    }
+    
     lines.push(thin);
   });
+
+  // Add total row
+  var totalRow = padR("TOTAL", secW) + categories.map(function(cat) {
+    var total = SECTION_KEYS.reduce(function(sum, s) { return sum + counts[cat.key][s]; }, 0);
+    return padC(String(total), colW);
+  }).join("");
+  lines.push(totalRow);
+  lines.push(sep);
 
   lines.push("```");
   lines.push("");
