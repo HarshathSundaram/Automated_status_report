@@ -40,11 +40,23 @@ function runDailyReport() {
     return;
   }
 
+  // Check if today is a weekday (1=Monday, 6=Saturday, 0=Sunday)
+  var istOffset = 5.5 * 60 * 60 * 1000;
+  var nowIST = new Date(new Date().getTime() + istOffset);
+  var dayOfWeek = nowIST.getDay();
+  
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    Logger.log("Report skipped: Weekend detected. Reports run Monday-Friday only.");
+    return;
+  }
+
   Logger.log("=== Run started (Board " + BOARD_ID + ") ===");
 
   var window      = getReportWindow();
-  var winStart    = formatISTDate(window.yesterday10am);
-  var winEnd      = formatISTDate(window.today10am);
+  var winStart    = formatISTDate(window.startTime);
+  var winEnd      = formatISTDate(window.endTime);
+  var isMonday    = dayOfWeek === 1;
+  var consolidationNote = isMonday ? "consolidated from Friday to Monday" : "";
 
   // ── Report 1 ──
   Logger.log("Report 1 — fetching section data...");
@@ -101,7 +113,7 @@ function runDailyReport() {
   Logger.log("Report 2 computed successfully.");
 
   // ── Post to Google Chat ──
-  var report1 = formatReport1(counts, completedYesterday, newTickets);
+  var report1 = formatReport1(counts, completedYesterday, newTickets, consolidationNote);
   var report2 = formatReport2(table);
 
   Logger.log("Posting Report 1 to Google Chat...");
@@ -197,9 +209,20 @@ function getReportWindow() {
   var today10am     = new Date(nowIST);
   today10am.setHours(10, 0, 0, 0);
 
-  var yesterday10am = new Date(today10am.getTime() - 24 * 60 * 60 * 1000);
+  var dayOfWeek = nowIST.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+  var startTime, endTime;
+  
+  if (dayOfWeek === 1) {
+    // Monday: get Friday 10 AM to Monday 10 AM
+    startTime = new Date(today10am.getTime() - 3 * 24 * 60 * 60 * 1000);
+  } else {
+    // Tuesday-Friday: get yesterday 10 AM
+    startTime = new Date(today10am.getTime() - 24 * 60 * 60 * 1000);
+  }
+  
+  endTime = today10am;
 
-  return { yesterday10am: yesterday10am, today10am: today10am };
+  return { startTime: startTime, endTime: endTime };
 }
 
 function formatISTDate(d) {
@@ -218,7 +241,7 @@ function ageBucket(days) {
 
 // ─── Report formatters ────────────────────────────────────────────────────────
 
-function formatReport1(counts, completedYesterday, newTickets) {
+function formatReport1(counts, completedYesterday, newTickets, consolidationNote) {
   var now     = new Date();
   var dateStr = Utilities.formatDate(now, "Asia/Kolkata", "dd MMM yyyy");
   var lines   = ["*📊 White Team Status Report — " + dateStr + "*", ""];
@@ -284,8 +307,13 @@ function formatReport1(counts, completedYesterday, newTickets) {
 
   lines.push("📊 *Grand Total:*            " + grandTotal);
   lines.push("");
-  lines.push("✅ *Completed Yesterday:*    " + completedYesterday);
+  lines.push("✅ *Completed:*              " + completedYesterday);
   lines.push("🆕 *New Tickets:*            " + newTickets);
+  
+  if (consolidationNote) {
+    lines.push("");
+    lines.push("_Note: " + consolidationNote + "_");
+  }
 
   return lines.join("\n");
 }
@@ -309,6 +337,15 @@ function formatReport2(table) {
     lines.push(row);
   });
 
+  // Add total row
+  var totalRow = padR("TOTAL", priW) + AGE_BUCKETS.map(function(b) {
+    var total = PRIORITIES.reduce(function(sum, p) { return sum + table[p][b]; }, 0);
+    return padL(String(total), colW);
+  }).join("");
+  lines.push(sep);
+  lines.push(totalRow);
+  lines.push(sep);
+
   lines.push("```");
   lines.push("*⚠️ Client Requests are not part of SLA*");
 
@@ -331,7 +368,8 @@ function repeat(ch, n) { var r = ""; for (var i = 0; i < n; i++) r += ch; return
 
 /**
  * Run this function ONCE from the Apps Script editor to register the daily trigger.
- * After that, runDailyReport() fires automatically every day at 10:00–11:00 AM IST.
+ * After that, runDailyReport() fires automatically every day at 10:00–11:00 AM IST,
+ * but only on weekdays (Monday-Friday). Weekend triggers are skipped.
  *
  * IMPORTANT: First set the Google Sheet timezone to Asia/Kolkata:
  *   File → Settings → Time zone → (UTC+05:30) India Standard Time
@@ -350,5 +388,5 @@ function setupDailyTrigger() {
     .atHour(10)   // 10:00–11:00 AM in sheet timezone (set to Asia/Kolkata)
     .create();
 
-  Logger.log("✅ Daily trigger registered. Fires at 10:00–11:00 AM IST every day.");
+  Logger.log("✅ Daily trigger registered. Fires at 10:00–11:00 AM IST every day (Monday-Friday only).");
 }
